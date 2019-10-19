@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Todo List</title>
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/index.css">
+    <link rel="stylesheet" href="/js/nprogress/nprogress.css">
+</head>
+
+<body>
+    <section class="todoapp">
+        <header class="header">
+            <h1>todos</h1>
+            <input type="text" class="new-todo" placeholder="What needs to be done?" autofocus id="task">
+        </header>
+        <!-- This section should be hidden by default and shown when there are todos -->
+        <section class="main">
+            <input class="toggle-all" type="checkbox">
+            <ul class="todo-list" id="todo-list"></ul>
+        </section>
+        <!-- This footer should hidden by default and shown when there are todos -->
+        <footer class="footer">
+            <!-- This should be `0 items left` by default -->
+            <span class="todo-count"><strong id="count">0</strong> item left</span>
+            <!-- Remove this if you don't implement routing -->
+            <ul class="filters">
+                <li>
+                    <a class="selected" href="javascript:;" id="all">All</a>
+                </li>
+                <li>
+                    <a href="javascript:;" id="active">Active</a>
+                </li>
+                <li>
+                    <a href="javascript:;" id="comepleted">Completed</a>
+                </li>
+            </ul>
+            <!-- Hidden if no completed items are left ↓ -->
+            <button class="clear-completed">Clear completed</button>
+        </footer>
+    </section>
+    <script src="/js/jquery.min.js"></script>
+    <script src="/js/template-web.js"></script>
+    <script src="/js/nprogress/nprogress.js"></script>
+    <!-- 任务列表模板 -->
+    <script type="text/html" id="taskTpl">
+        {{each tasks}}
+        <li class="{{$value.completed ? 'completed' : ''}}">
+            <div class="view">
+                <input class="toggle" type="checkbox" {{$value.completed ? 'checked' : ''}}>
+                <label>{{$value.title}}</label>
+                <button class="destroy" data-id="{{$value._id}}"></button>
+            </div>
+            <input class="edit">
+        </li>
+        {{/each}}
+    </script>
+    <script type="text/javascript">
+        let taskary = [];
+        let leftcount;
+        //进度条
+        $(document).on('ajaxStart', function() {
+            NProgress.start();
+        });
+        $(document).on('ajaxComplete', function() {
+            NProgress.done();
+        });
+        //一进入页面就渲染
+        $.ajax({
+            url: '/task',
+            type: 'get',
+            success: function(data) {
+                taskary = data;
+                render(taskary);
+                $('#count').text(search(taskary));
+            }
+        });
+        //添加todolist
+        $('#task').on('keyup', function(e) {
+            if (e.keyCode === 13) {
+                const value = $(this).val();
+                if (value.trim().length == 0) {
+                    alert('请输入任务');
+                    return;
+                }
+                $.ajax({
+                    url: '/add',
+                    contentType: 'application/json',
+                    data: {
+                        title: value
+                    },
+                    type: 'get',
+                    success: function(data) {
+                        taskary = data;
+                        render(taskary);
+                        $('#task').val('');
+                        $('#count').text(search(taskary));
+                        $('#all').addClass('selected').parent().siblings('li').find('a').removeClass('selected');
+                    }
+                })
+            }
+        });
+        //删除  事件委托
+        $('#todo-list').on('click', '.destroy', function() {
+            const id = $(this).attr('data-id');
+            $.ajax({
+                url: '/delete',
+                type: 'get',
+                contentType: 'application/json',
+                data: {
+                    _id: id
+                },
+                success: function(data) {
+                    taskary = data;
+                    render(taskary);
+                    $('#count').text(search(taskary));
+                    $('#all').addClass('selected').parent().siblings('li').find('a').removeClass('selected');
+                }
+            })
+        });
+        //更改任务状态 事件委托
+        $('#todo-list').on('click', '.toggle', function() {
+            //获取当前选中状态
+            const staus = $(this).prop('checked');
+            const _id = $(this).siblings('button').attr('data-id');
+            $.ajax({
+                url: '/completed',
+                type: 'get',
+                contentType: 'application/json',
+                data: {
+                    _id: _id,
+                    completed: staus
+                },
+                success: function(data) {
+                    taskary = data;
+                    render(taskary);
+                    $('#count').text(search(taskary));
+                }
+            })
+        });
+        //修改  事件委托
+        $('#todo-list').on('dblclick', 'label', function() {
+            $(this).parent().parent().attr('class', 'editing');
+            const _id = $(this).siblings('button').attr('data-id');
+            $(this).parent().siblings('input').val($(this).text()).focus().on('blur', function() {
+                $.ajax({
+                    url: '/modify',
+                    type: 'get',
+                    contentType: 'application/json',
+                    data: {
+                        _id: _id,
+                        title: $(this).val()
+                    },
+                    success: function(data) {
+                        $(this).parent().removeClass('editing');
+                        taskary = data;
+                        render(taskary);
+                        $('#count').text(search(taskary));
+                    }
+                })
+            });
+        });
+        //底部 Active 按钮
+        $('#active').on('click', function() {
+            $(this).addClass('selected');
+            $(this).parent().siblings('li').find('a').removeClass('selected');
+            let new_taskary = (taskary.filter(item => item.completed == false));
+            render(new_taskary);
+        });
+        //completed按钮
+        $('#comepleted').on('click', function() {
+            $(this).addClass('selected');
+            $(this).parent().siblings('li').find('a').removeClass('selected');
+            let new_taskary = (taskary.filter(item => item.completed == true));
+            render(new_taskary);
+        });
+        //all按钮
+        $('#all').on('click', function() {
+            $(this).addClass('selected');
+            $(this).parent().siblings('li').find('a').removeClass('selected');
+            render(taskary);
+        });
+        //清除按钮
+
+        //渲染
+        function render(obj) {
+            const html = template('taskTpl', {
+                tasks: obj
+            });
+            $('#todo-list').html(html);
+        }
+        //计算未完成任务的数量
+        function search(array) {
+            let countleft = 0;
+            array.forEach(ele => {
+                if (ele.completed == false) {
+                    countleft++;
+                }
+
+            });
+            return countleft;
+        }
+    </script>
+</body>
+
+</html>
