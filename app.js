@@ -35,6 +35,13 @@ app.get('/modify', async(req, res) => {
     const tasks = await Task.find();
     res.send(tasks);
 });
+//删除完成的任务
+app.get('/deletecpl', async(req, res) => {
+    await Task.deleteMany({ completed: true });
+    const tasks = await Task.find();
+    res.send(tasks);
+});
+
 //图标请求
 app.get('/favicon.ico', (req, res) => {
     res.send();

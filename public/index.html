@@ -38,7 +38,7 @@
                 </li>
             </ul>
             <!-- Hidden if no completed items are left ↓ -->
-            <button class="clear-completed">Clear completed</button>
+            <button class="clear-completed" id="clearc-pl">Clear completed</button>
         </footer>
     </section>
     <script src="/js/jquery.min.js"></script>
@@ -183,8 +183,20 @@
             render(taskary);
         });
         //清除按钮
+        $('#clearc-pl').on('click', function() {
+                $.ajax({
+                    type: 'get',
+                    url: '/deletecpl',
+                    success: function(data) {
+                        taskary = data;
+                        $('#all').addClass('selected').parent().siblings().find('a').removeClass('selected');
+                        render(taskary);
 
-        //渲染
+                    }
+                })
+
+            })
+            //渲染
         function render(obj) {
             const html = template('taskTpl', {
                 tasks: obj
